@@ -1,10 +1,13 @@
 # gradebook.py -- the department gradebook service
-# started by someone who left. it works. don't touch it.
-import json
-import os
-import sys
+
 import datetime
 import http.server
+import json
+import logging
+import sys
+
+from errors import ConflictError, NotFoundError, ValidationError
+from models import parse_assessment, parse_mark, parse_student
 
 DATA = "gradebook.json"
 STATE = {}
@@ -13,39 +16,49 @@ STATE = {}
 def load():
     global STATE
     try:
-        f = open(DATA)
-        STATE = json.load(f)
-        f.close()
-    except:
+        with open(DATA) as f:
+            STATE = json.load(f)
+    except FileNotFoundError:
         STATE = {"students": {}, "assessments": {}, "marks": []}
 
 
 def save():
-    try:
-        f = open(DATA, "w")
+    with open(DATA, "w") as f:
         json.dump(STATE, f)
-        f.close()
-    except:
-        pass
+
 
 
 def pct(sid):
-    total = 0
-    got = 0
+    total = 0.0
+    got = 0.0
+
     for m in STATE["marks"]:
         if m["student"] == sid:
             a = STATE["assessments"].get(m["assessment"])
             if a:
-                got = got + float(m["score"]) * float(a["weight"]) / float(a["total"])
-                total = total + float(a["weight"])
+                try:
+                    score = float(m["score"])
+                    weight = float(a["weight"])
+                    assessment_total = float(a["total"])
+                except (TypeError, ValueError):
+                    continue
+
+                if assessment_total <= 0:
+                    continue
+
+                got += score * weight / assessment_total
+                total += weight
+
     if total == 0:
         return "0"
+
     return str(round(got, 2))
 
 
+
 class Handler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, *args):
-        pass
+    def log_message(self, format, *args):
+        logging.info("%s - %s", self.address_string(), format % args)
 
     def _send(self, code, obj):
         body = json.dumps(obj).encode()
@@ -55,101 +68,152 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _error_boundary(self, operation):
+        try:
+            status, body = operation()
+        except ValidationError as exc:
+            status, body = 400, {"error": str(exc)}
+        except NotFoundError as exc:
+            status, body = 404, {"error": str(exc)}
+        except ConflictError as exc:
+            status, body = 409, {"error": str(exc)}
+        except Exception:
+            logging.exception("Unexpected error handling %s %s", self.command, self.path)
+            status, body = 500, {"error": "internal error"}
+
+        self._send(status, body)
+
     def do_GET(self):
+        self._error_boundary(self._get)
+
+    def _get(self):
         if self.path == "/students":
-            self._send(200, list(STATE["students"].values()))
-        elif self.path.startswith("/students/"):
-            sid = self.path.split("/")[2]
-            if sid in STATE["students"]:
-                s = dict(STATE["students"][sid])
-                s["percentage"] = pct(sid)
-                self._send(200, s)
-            else:
-                self._send(200, {"error": "not found"})
-        elif self.path == "/assessments":
-            self._send(200, list(STATE["assessments"].values()))
-        elif self.path == "/report":
-            out = []
+            return 200, list(STATE["students"].values())
+
+        if self.path.startswith("/students/"):
+            parts = self.path.split("/")
+            if len(parts) != 3 or not parts[2]:
+                raise NotFoundError("student not found")
+
+            sid = parts[2]
+            if sid not in STATE["students"]:
+                raise NotFoundError("student not found")
+
+            student = dict(STATE["students"][sid])
+            student["percentage"] = pct(sid)
+            return 200, student
+
+        if self.path == "/assessments":
+            return 200, list(STATE["assessments"].values())
+
+        if self.path == "/report":
+            report = []
             for sid in STATE["students"]:
-                out.append({"id": sid, "name": STATE["students"][sid]["name"], "pct": pct(sid)})
-            self._send(200, out)
-        else:
-            self._send(200, {"error": "unknown"})
+                report.append(
+                    {
+                        "id": sid,
+                        "name": STATE["students"][sid]["name"],
+                        "pct": pct(sid),
+                    }
+                )
+            return 200, report
+
+        raise NotFoundError("unknown route")
 
     def do_POST(self):
-        n = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(n)
+        self._error_boundary(self._post)
+
+    def _post(self):
+        content_length = self.headers.get("Content-Length")
+
+        if content_length is None or not content_length.isdigit():
+            raise ValidationError("Content-Length must be a number")
+
+        length = int(content_length)
+        raw = self.rfile.read(length)
+
         try:
-            d = json.loads(raw)
-        except:
-            self._send(200, {"error": "bad json"})
-            return
+            data = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise ValidationError("body must be valid JSON") from None
+
+        if not isinstance(data, dict):
+            raise ValidationError("body must be a JSON object")
 
         if self.path == "/students":
-            if "id" not in d or d["id"] == "":
-                self._send(200, {"error": "id required"})
-                return
-            if "name" not in d or d["name"] == "":
-                self._send(200, {"error": "name required"})
-                return
-            if d["id"] in STATE["students"]:
-                self._send(200, {"error": "exists"})
-                return
-            STATE["students"][d["id"]] = {
-                "id": d["id"],
-                "name": d["name"],
+            student = parse_student(data)
+
+            if student.id in STATE["students"]:
+                raise ConflictError("student already exists")
+
+            record = {
+                "id": student.id,
+                "name": student.name,
                 "joined": str(datetime.datetime.now()),
             }
-            save()
-            self._send(200, STATE["students"][d["id"]])
 
-        elif self.path == "/assessments":
-            if "id" not in d or d["id"] == "":
-                self._send(200, {"error": "id required"})
-                return
-            if "title" not in d:
-                self._send(200, {"error": "title required"})
-                return
-            STATE["assessments"][d["id"]] = {
-                "id": d["id"],
-                "title": d["title"],
-                "weight": d.get("weight", "0"),
-                "total": d.get("total", "100"),
+            STATE["students"][student.id] = record
+            save()
+            return 200, record
+
+        if self.path == "/assessments":
+            assessment = parse_assessment(data)
+
+            if assessment.id in STATE["assessments"]:
+                raise ConflictError("assessment already exists")
+
+            record = {
+                "id": assessment.id,
+                "title": assessment.title,
+                "weight": data["weight"],
+                "total": data["total"],
             }
-            save()
-            self._send(200, STATE["assessments"][d["id"]])
 
-        elif self.path == "/marks":
-            if "student" not in d or d["student"] == "":
-                self._send(200, {"error": "student required"})
-                return
-            if "assessment" not in d:
-                self._send(200, {"error": "assessment required"})
-                return
-            if d["student"] not in STATE["students"]:
-                self._send(200, {"error": "no such student"})
-                return
-            STATE["marks"].append(
-                {
-                    "student": d["student"],
-                    "assessment": d["assessment"],
-                    "score": d.get("score", "0"),
-                    "at": str(datetime.datetime.now()),
-                }
-            )
+            STATE["assessments"][assessment.id] = record
             save()
-            print("recorded mark for " + d["student"] + " score " + str(d.get("score")))
-            self._send(200, {"ok": True})
-        else:
-            self._send(200, {"error": "unknown"})
+            return 200, record
+
+        if self.path == "/marks":
+            mark = parse_mark(data)
+
+            if mark.student not in STATE["students"]:
+                raise NotFoundError("student not found")
+
+            if mark.assessment not in STATE["assessments"]:
+                raise NotFoundError("assessment not found")
+
+            assessment = STATE["assessments"][mark.assessment]
+            if mark.score > float(assessment["total"]):
+                raise ValidationError("score must not exceed total")
+
+            record = {
+                "student": mark.student,
+                "assessment": mark.assessment,
+                "score": data["score"],
+                "at": str(datetime.datetime.now()),
+            }
+
+            STATE["marks"].append(record)
+            save()
+
+            logging.info(
+                "Recorded mark for %s with score %s",
+                mark.student,
+                mark.score,
+            )
+            return 200, {"ok": True}
+
+        raise NotFoundError("unknown route")
 
 
 def main(argv=sys.argv):
+    logging.basicConfig(level=logging.INFO)
     load()
     port = 8000
     if len(argv) > 1:
         port = int(argv[1])
-    print("gradebook on " + str(port))
+
+    logging.info("gradebook on %s", port)
     http.server.HTTPServer(("", port), Handler).serve_forever()
 
 
