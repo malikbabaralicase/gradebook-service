@@ -1,8 +1,6 @@
-import math
+
 import pytest
 
-from models import parse_number
-from errors import ValidationError
 from models import (
     Assessment,
     Mark,
@@ -12,26 +10,35 @@ from models import (
     parse_number,
     parse_student,
 )
+from errors import ValidationError
 
 
-def test_numeric_string_accepted():
-    result = parse_number("75", "weight")
-    assert result == 75.0
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        pytest.param("15", 15.0, id="numeric-string"),
+        pytest.param(15, 15.0, id="integer"),
+        pytest.param("2.5", 2.5, id="decimal-string"),
+    ],
+)
+def test_valid_numbers_are_accepted(value, expected):
+    assert parse_number(value, "weight") == expected
 
 
-def test_text_rejected():
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("abc", id="text"),
+        pytest.param(True, id="boolean"),
+        pytest.param(None, id="none"),
+        pytest.param([], id="list"),
+        pytest.param("nan", id="nan"),
+        pytest.param("inf", id="infinity"),
+    ],
+)
+def test_invalid_numbers_are_rejected(value):
     with pytest.raises(ValidationError):
-        parse_number("hello", "weight")
-
-
-def test_boolean_rejected():
-    with pytest.raises(ValidationError):
-        parse_number(True, "weight")
-
-
-def test_nan_rejected():
-    with pytest.raises(ValidationError):
-        parse_number(math.nan, "weight")
+        parse_number(value, "weight")
 
 
 def test_zero_assessment_total_rejected():
