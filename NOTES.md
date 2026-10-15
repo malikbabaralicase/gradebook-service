@@ -74,3 +74,17 @@ curl.exe -i -X POST http://localhost:8000/students -H "Content-Type: application
 - `gradebook.py:84`
 
 **Observation:** The existing code contains linting issues and overly broad exception handling. These findings will be addressed in the relevant later tasks.
+
+
+## Task 8 — Repeat Task 2 Requests
+
+Repeated the Task 2 HTTP requests using `curl.exe` and the JSON files in the `requests/` directory.
+
+| Request | Actual HTTP status | Actual response |
+|---|---:|---|
+| POST `/assessments` — `assessment.json` | 409 Conflict | `assessment already exists` |
+| POST `/marks` — `mark.json` | 400 Bad Request | `score must be a finite number` |
+| POST `/marks` — `missing-assessment-mark.json` | 404 Not Found | `assessment not found` |
+| POST `/assessments` — `zero-assessment.json` | 400 Bad Request | `total must be greater than 0` |
+
+The service returned structured JSON error responses for the duplicate assessment, invalid score, missing assessment, and zero assessment total.
