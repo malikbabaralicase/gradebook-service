@@ -5,41 +5,50 @@ import http.server
 import json
 import logging
 import sys
+from collections.abc import Callable
+from typing import Any
 
 from errors import ConflictError, NotFoundError, ValidationError
 from models import parse_assessment, parse_mark, parse_student
 
-DATA = "gradebook.json"
-STATE = {}
+DATA: str = "gradebook.json"
+STATE: dict[str, Any] = {
+    "students": {},
+    "assessments": {},
+    "marks": [],
+}
+
+logger = logging.getLogger(__name__)
 
 
-def load():
+def load() -> None:
     global STATE
+
     try:
-        with open(DATA) as f:
-            STATE = json.load(f)
+        with open(DATA) as file:
+            STATE = json.load(file)
     except FileNotFoundError:
         STATE = {"students": {}, "assessments": {}, "marks": []}
 
 
-def save():
-    with open(DATA, "w") as f:
-        json.dump(STATE, f)
+def save() -> None:
+    with open(DATA, "w") as file:
+        json.dump(STATE, file)
 
 
-
-def pct(sid):
+def pct(sid: str) -> str:
     total = 0.0
     got = 0.0
 
-    for m in STATE["marks"]:
-        if m["student"] == sid:
-            a = STATE["assessments"].get(m["assessment"])
-            if a:
+    for mark in STATE["marks"]:
+        if mark["student"] == sid:
+            assessment = STATE["assessments"].get(mark["assessment"])
+
+            if assessment:
                 try:
-                    score = float(m["score"])
-                    weight = float(a["weight"])
-                    assessment_total = float(a["total"])
+                    score = float(mark["score"])
+                    weight = float(assessment["weight"])
+                    assessment_total = float(assessment["total"])
                 except (TypeError, ValueError):
                     continue
 
@@ -55,12 +64,11 @@ def pct(sid):
     return str(round(got, 2))
 
 
-
 class Handler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        logging.info("%s - %s", self.address_string(), format % args)
+    def log_message(self, format: str, *args: object) -> None:
+        logger.info("%s - %s", self.address_string(), format % args)
 
-    def _send(self, code, obj):
+    def _send(self, code: int, obj: object) -> None:
         body = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -68,7 +76,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _error_boundary(self, operation):
+    def _error_boundary(
+        self,
+        operation: Callable[[], tuple[int, object]],
+    ) -> None:
         try:
             status, body = operation()
         except ValidationError as exc:
@@ -78,24 +89,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except ConflictError as exc:
             status, body = 409, {"error": str(exc)}
         except Exception:
-            logging.exception("Unexpected error handling %s %s", self.command, self.path)
+            logger.exception(
+                "Unexpected error handling %s %s",
+                self.command,
+                self.path,
+            )
             status, body = 500, {"error": "internal error"}
 
         self._send(status, body)
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         self._error_boundary(self._get)
 
-    def _get(self):
+    def _get(self) -> tuple[int, object]:
         if self.path == "/students":
             return 200, list(STATE["students"].values())
 
         if self.path.startswith("/students/"):
             parts = self.path.split("/")
+
             if len(parts) != 3 or not parts[2]:
                 raise NotFoundError("student not found")
 
             sid = parts[2]
+
             if sid not in STATE["students"]:
                 raise NotFoundError("student not found")
 
@@ -108,6 +125,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         if self.path == "/report":
             report = []
+
             for sid in STATE["students"]:
                 report.append(
                     {
@@ -116,14 +134,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         "pct": pct(sid),
                     }
                 )
+
             return 200, report
 
         raise NotFoundError("unknown route")
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         self._error_boundary(self._post)
 
-    def _post(self):
+    def _post(self) -> tuple[int, object]:
         content_length = self.headers.get("Content-Length")
 
         if content_length is None or not content_length.isdigit():
@@ -183,6 +202,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 raise NotFoundError("assessment not found")
 
             assessment = STATE["assessments"][mark.assessment]
+
             if mark.score > float(assessment["total"]):
                 raise ValidationError("score must not exceed total")
 
@@ -196,7 +216,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             STATE["marks"].append(record)
             save()
 
-            logging.info(
+            logger.info(
                 "Recorded mark for %s with score %s",
                 mark.student,
                 mark.score,
@@ -206,14 +226,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
         raise NotFoundError("unknown route")
 
 
-def main(argv=sys.argv):
+def main(argv: list[str] = sys.argv) -> None:
     logging.basicConfig(level=logging.INFO)
     load()
-    port = 8000
-    if len(argv) > 1:
-        port = int(argv[1])
 
-    logging.info("gradebook on %s", port)
+    port = 8000
+
+    if len(argv) > 1:
+        port_text = argv[1]
+
+        if not port_text.isdigit():
+            raise SystemExit("port must be a whole number from 1 to 65535")
+
+        port = int(port_text)
+
+        if not 1 <= port <= 65535:
+            raise SystemExit("port must be a whole number from 1 to 65535")
+
+    logger.info("gradebook on %s", port)
     http.server.HTTPServer(("", port), Handler).serve_forever()
 
 
