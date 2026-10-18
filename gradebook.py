@@ -9,7 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 from errors import ConflictError, NotFoundError, ValidationError
-from models import parse_assessment, parse_mark, parse_student
+from models import Mark, parse_assessment, parse_mark, parse_student
 
 DATA: str = "gradebook.json"
 STATE: dict[str, Any] = {
@@ -63,6 +63,35 @@ def pct(sid: str) -> str:
 
     return str(round(got, 2))
 
+def now() -> str:
+    return str(datetime.datetime.now())
+
+
+def add_mark(
+    state: dict[str, Any],
+    mark: Mark,
+    now: Callable[[], str],
+    save: Callable[[], None],
+) -> None:
+    if mark.student not in state["students"]:
+        raise NotFoundError("student not found")
+
+    assessment = state["assessments"].get(mark.assessment)
+    if assessment is None:
+        raise NotFoundError("assessment not found")
+
+    if mark.score > float(assessment["total"]):
+        raise ValidationError("score must not exceed total")
+
+    record = {
+        "student": mark.student,
+        "assessment": mark.assessment,
+        "score": mark.score,
+        "at": now(),
+    }
+
+    state["marks"].append(record)
+    save()
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
@@ -192,37 +221,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             save()
             return 200, record
 
+        
         if self.path == "/marks":
             mark = parse_mark(data)
-
-            if mark.student not in STATE["students"]:
-                raise NotFoundError("student not found")
-
-            if mark.assessment not in STATE["assessments"]:
-                raise NotFoundError("assessment not found")
-
-            assessment = STATE["assessments"][mark.assessment]
-
-            if mark.score > float(assessment["total"]):
-                raise ValidationError("score must not exceed total")
-
-            record = {
-                "student": mark.student,
-                "assessment": mark.assessment,
-                "score": data["score"],
-                "at": str(datetime.datetime.now()),
-            }
-
-            STATE["marks"].append(record)
-            save()
-
+            add_mark(STATE, mark, now, save)
             logger.info(
                 "Recorded mark for %s with score %s",
                 mark.student,
                 mark.score,
             )
             return 200, {"ok": True}
-
         raise NotFoundError("unknown route")
 
 

@@ -1,16 +1,15 @@
 
 import pytest
 
+from errors import ValidationError
 from models import (
     Assessment,
     Mark,
     Student,
     parse_assessment,
-    parse_mark,
     parse_number,
     parse_student,
 )
-from errors import ValidationError
 
 
 @pytest.mark.parametrize(
