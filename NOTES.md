@@ -88,3 +88,48 @@ Repeated the Task 2 HTTP requests using `curl.exe` and the JSON files in the `re
 | POST `/assessments` — `zero-assessment.json` | 400 Bad Request | `total must be greater than 0` |
 
 The service returned structured JSON error responses for the duplicate assessment, invalid score, missing assessment, and zero assessment total.
+
+## Lab 04 — Task 8: Mutation Testing and Test Doubles
+
+### (a) Mutation testing
+
+Temporarily changed the percentage calculation in `gradebook.py` from division to multiplication:
+
+```python
+got += score * weight * assessment_total
+```
+
+**Command:** `pytest -v`
+
+**Actual result:** 3 failed, 24 passed.
+
+**Failures observed:**
+- `one-mark`: expected `7.5`, but got `3000.0`.
+- `full-mark`: expected `10.0`, but got `4000.0`.
+- `two-marks`: expected `31.5`, but got `63000.0`.
+
+**Observation:** The percentage tests detected the incorrect calculation. The zero-mark and no-marks cases still passed, demonstrating why multiple test cases are important.
+
+Restored the correct calculation:
+
+```python
+got += score * weight / assessment_total
+```
+
+**Verification command:** `pytest -v`
+
+**Final result:** 27 passed.
+
+### (b) Test doubles
+
+A **stub** provides predefined responses to a dependency so a test can control its behavior.
+
+A **fake** is a simplified working implementation of a dependency, suitable for testing but not intended for production use.
+
+A **mock** is a test double that can be used to verify interactions with a dependency, such as whether a function was called.
+
+### (c) Why mocks were not needed for percentage and storage tests
+
+**Percentage tests:** The tests use controlled gradebook state through fixtures and check the returned percentage. Mocking is unnecessary because the calculation can be tested directly using known input data.
+
+**Storage tests:** The tests use temporary files through `tmp_path` and redirect the data-file path using `monkeypatch`. This tests actual JSON file reading and writing without mocking the file operations.
