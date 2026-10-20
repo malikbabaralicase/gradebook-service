@@ -140,3 +140,10 @@ A **mock** is a test double that can be used to verify interactions with a depen
 
 - **Total coverage:** 48%
 - **File with the lowest coverage:** `gradebook.py` — 37%
+
+## Task 2 — TDD Cycles
+
+### Cycle 1
+- Test: `([], 50)` fits.
+- Red failure: `ModuleNotFoundError: No module named 'rules'`
+- Green: `1 passed`.
