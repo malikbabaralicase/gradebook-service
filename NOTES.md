@@ -133,3 +133,10 @@ A **mock** is a test double that can be used to verify interactions with a depen
 **Percentage tests:** The tests use controlled gradebook state through fixtures and check the returned percentage. Mocking is unnecessary because the calculation can be tested directly using known input data.
 
 **Storage tests:** The tests use temporary files through `tmp_path` and redirect the data-file path using `monkeypatch`. This tests actual JSON file reading and writing without mocking the file operations.
+
+# Lab 05 Notes
+
+## Task 1 — Initial Coverage
+
+- **Total coverage:** 48%
+- **File with the lowest coverage:** `gradebook.py` — 37%
