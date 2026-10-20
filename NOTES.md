@@ -147,3 +147,19 @@ A **mock** is a test double that can be used to verify interactions with a depen
 - Test: `([], 50)` fits.
 - Red failure: `ModuleNotFoundError: No module named 'rules'`
 - Green: `1 passed`.
+
+### Cycle 2
+- Test: `([60], 50)` raises `ValidationError` with `"100"` in the message.
+- Red failure: Not recorded.
+- Green: `2 passed`.
+
+### Cycle 3
+- Test: `([60], 40)` fits.
+- Red failure: None; the test passed on the first run.
+- Green: `3 passed`.
+
+### Cycle 4
+- Test: `([9.3, 27.3, 33.7], 29.7)` fits.
+- Red failure: `errors.ValidationError: Total weight cannot exceed 100`
+- Red result: `1 failed, 3 passed`.
+- Green: `4 passed`.
