@@ -194,3 +194,19 @@ almost full coverage while a broken formula still passed.
 
 **Function in `gradebook.py` with no test at all:** `main()`
 (its port-parsing logic is never run by any test).
+
+### (c) Undo and cleanup
+- Changed `*` back to `/` in `pct()` and deleted `tests/test_weak.py`.
+- Full suite is green again.
+
+### Results
+- **New total coverage:** 52%  (was 48% in Task 1)
+
+### What coverage told me, and what it could not
+Coverage told me which lines and branches of `pct()` ran during the test,
+so it is useful for finding code that no test touches. It could not tell me
+whether the test checked anything, because a test with no assertions gave
+almost full coverage while a broken formula still passed.
+
+**Function in `gradebook.py` with no test at all:** `main()`
+(lines 259-276 are missing from the coverage report). `now()` is also untested.
