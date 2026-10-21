@@ -1,6 +1,5 @@
 from unittest.mock import Mock, patch
 
-import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -12,7 +11,6 @@ def fixed_now() -> str:
     return "2026-10-21 09:00:00"
 
 
-@pytest.mark.xfail(strict=True, reason="duplicate marks are all counted")
 @given(
     scores=st.lists(
         st.integers(min_value=0, max_value=20),

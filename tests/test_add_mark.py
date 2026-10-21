@@ -59,3 +59,22 @@ def test_add_mark_rejects_invalid_mark(state, mark, error, message):
 
     assert state["marks"] == original_marks
     save.assert_not_called()
+
+def test_second_mark_replaces_the_first(state):
+    save = Mock()
+
+    add_mark(
+        state,
+        Mark(student="S1", assessment="A1", score=5),
+        fixed_now,
+        save,
+    )
+    add_mark(
+        state,
+        Mark(student="S1", assessment="A1", score=18),
+        fixed_now,
+        save,
+    )
+
+    assert len(state["marks"]) == 1
+    assert state["marks"][0]["score"] == 18

@@ -223,3 +223,15 @@ almost full coverage while a broken formula still passed.
   already has a mark for that assessment. `pct()` then counts every duplicate,
   so a student's percentage can exceed the assessment's weight (10).
 - Marked `xfail(strict=True)` so the suite stays green until the fix in Task 8.
+
+## Task 8 — Fix the Duplicate-Mark Defect
+
+- New test `test_second_mark_replaces_the_first` (scores 5 then 18) failed
+  first with `assert 2 == 1`, then passed after the fix.
+- `add_mark` now removes the student's old mark for that assessment after
+  all checks pass, then stores the new one.
+- With the fix in place, the property test XPASSed under `strict=True`
+  (pytest reported it as a failure), so the xfail marker was removed and the
+  test now passes normally.
+- **Final total coverage:** XX%
+- ruff, mypy and mypy --strict: clean.
