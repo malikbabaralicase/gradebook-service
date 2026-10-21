@@ -178,3 +178,19 @@ A **mock** is a test double that can be used to verify interactions with a depen
   - `one-mark`: got `3000.0`, expected `7.5`
   - `full-mark`: got `4000.0`, expected `10.0`
   - `two-marks`: got `63000.0`, expected `31.5`
+
+  ### (c) Undo and cleanup
+- Changed `*` back to `/` in `pct()` and deleted `tests/test_weak.py`.
+- Full suite is green again: 34 passed.
+
+### Results
+- **New total coverage:** XX%  (was 48% in Task 1)
+
+### What coverage told me, and what it could not
+Coverage told me which lines and branches of `pct()` ran during the test,
+so it is useful for finding code that no test touches. It could not tell me
+whether the test checked anything, because a test with no assertions gave
+almost full coverage while a broken formula still passed.
+
+**Function in `gradebook.py` with no test at all:** `main()`
+(its port-parsing logic is never run by any test).
