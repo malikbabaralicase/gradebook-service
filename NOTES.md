@@ -215,3 +215,11 @@ almost full coverage while a broken formula still passed.
 - Changed `>` to `>=` in the score check of `add_mark`.
 - Failing boundary test: `test_score_on_the_edge_is_accepted[score-20]`
 - Change undone; suite green again.
+
+## Task 7 — Property-Based Test
+
+- Failing example found by hypothesis: `scores=[...]`  <-- paste yours
+- Defect: `add_mark` appends a new mark every time, even when the student
+  already has a mark for that assessment. `pct()` then counts every duplicate,
+  so a student's percentage can exceed the assessment's weight (10).
+- Marked `xfail(strict=True)` so the suite stays green until the fix in Task 8.
