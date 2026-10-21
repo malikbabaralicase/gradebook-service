@@ -83,6 +83,15 @@ def add_mark(
     if mark.score > float(assessment["total"]):
         raise ValidationError("score must not exceed total")
 
+    state["marks"][:] = [
+        existing
+        for existing in state["marks"]
+        if not (
+            existing["student"] == mark.student
+            and existing["assessment"] == mark.assessment
+        )
+    ]
+
     record = {
         "student": mark.student,
         "assessment": mark.assessment,
@@ -231,15 +240,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path == "/assessments":
             assessment = parse_assessment(data)
 
-            record = {
+            assessment_record: dict[str, Any] = {
                 "id": assessment.id,
                 "title": assessment.title,
                 "weight": assessment.weight,
                 "total": assessment.total,
-            }   
+            }
 
-            add_assessment(STATE, record, save)
-            return 200, record
+            add_assessment(STATE, assessment_record, save)
+            return 200, assessment_record
 
 
         
