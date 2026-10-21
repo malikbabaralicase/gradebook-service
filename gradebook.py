@@ -234,9 +234,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             record = {
                 "id": assessment.id,
                 "title": assessment.title,
-                "weight": data["weight"],
-                "total": data["total"],
-            }
+                "weight": assessment.weight,
+                "total": assessment.total,
+            }   
 
             add_assessment(STATE, record, save)
             return 200, record
