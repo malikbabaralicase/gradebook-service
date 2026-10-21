@@ -210,3 +210,8 @@ almost full coverage while a broken formula still passed.
 
 **Function in `gradebook.py` with no test at all:** `main()`
 (lines 259-276 are missing from the coverage report). `now()` is also untested.
+
+## Task 6 — Boundary Tests
+- Changed `>` to `>=` in the score check of `add_mark`.
+- Failing boundary test: `test_score_on_the_edge_is_accepted[score-20]`
+- Change undone; suite green again.
