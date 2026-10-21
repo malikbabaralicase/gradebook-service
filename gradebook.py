@@ -1,5 +1,4 @@
 # gradebook.py -- the department gradebook service
-
 import datetime
 import http.server
 import json
@@ -10,6 +9,7 @@ from typing import Any
 
 from errors import ConflictError, NotFoundError, ValidationError
 from models import Mark, parse_assessment, parse_mark, parse_student
+from rules import ensure_weight_fits
 
 DATA: str = "gradebook.json"
 STATE: dict[str, Any] = {
@@ -91,6 +91,29 @@ def add_mark(
     }
 
     state["marks"].append(record)
+    save()
+
+
+def add_assessment(
+    state: dict[str, Any],
+    assessment: dict[str, Any],
+    save: Callable[[], None],
+) -> None:
+    """Validate, store, and save an assessment."""
+    assessment_id = assessment["id"]
+
+    if assessment_id in state["assessments"]:
+        raise ConflictError("assessment already exists")
+
+    ensure_weight_fits(
+        [
+            item["weight"]
+            for item in state["assessments"].values()
+        ],
+        assessment["weight"],
+    )
+
+    state["assessments"][assessment_id] = assessment
     save()
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -204,11 +227,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             save()
             return 200, record
 
+        
         if self.path == "/assessments":
             assessment = parse_assessment(data)
-
-            if assessment.id in STATE["assessments"]:
-                raise ConflictError("assessment already exists")
 
             record = {
                 "id": assessment.id,
@@ -217,9 +238,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "total": data["total"],
             }
 
-            STATE["assessments"][assessment.id] = record
-            save()
+            add_assessment(STATE, record, save)
             return 200, record
+
 
         
         if self.path == "/marks":
