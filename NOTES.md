@@ -163,3 +163,18 @@ A **mock** is a test double that can be used to verify interactions with a depen
 - Red failure: `errors.ValidationError: Total weight cannot exceed 100`
 - Red result: `1 failed, 3 passed`.
 - Green: `4 passed`.
+
+## Task 5 — Coverage Is Not Quality
+
+### (a) Weak test
+- `tests/test_weak.py` adds a mark with the `loaded` fixture and calls
+  `pct("S1")` with no assertions.
+- Coverage on `gradebook.py` showed almost every line of `pct()` as covered.
+  Missing lines: <paste from your report>.
+
+### (b) Mutation: `/` changed to `*` in `pct()`
+- Weak test alone: `1 passed` (the broken formula went unnoticed).
+- Full suite: `3 failed, 32 passed`.
+  - `one-mark`: got `3000.0`, expected `7.5`
+  - `full-mark`: got `4000.0`, expected `10.0`
+  - `two-marks`: got `63000.0`, expected `31.5`
